@@ -21,11 +21,12 @@ function cloudinary_add_instance($label)
     $baseurl = "$CFG->wwwroot/draftfile.php/$results->contextid/$results->component/$results->filearea/$results->itemid/$results->filename";
 
     // configure cloudinary
+    $config = get_config('cloudinary');
     \Cloudinary::config(array( 
-        "cloud_name" => "simaya", 
-        "api_key" => "788485246277552", 
-        "api_secret" => "2tyBTJxRVMdc-YGtqsTts79G6Y0", 
-        "secure" => true
+        "cloud_name" => $config->cloudname, 
+        "api_key" => $config->api_key, 
+        "api_secret" => $config->api_secret, 
+        "secure" => $config->secure
     ));
 
     // upload to cloudinary
