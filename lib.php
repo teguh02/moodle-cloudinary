@@ -4,14 +4,47 @@ if (!defined('MOODLE_INTERNAL')) {
     die('Direct access to this script is forbidden.');    ///  It must be included from a Moodle page
 }
 
+// import composer autoload
+require_once __DIR__ . '/vendor/autoload.php';
+
 function cloudinary_add_instance($label)
 {
-    global $DB;
-    
-    $label->url = json_encode($label);
+    global $DB, $CFG;
+
+    // get draft file id
+    $draftitemid = file_get_submitted_draft_itemid('attachment');
+
+    // search file in database
+    $results = $DB->get_record('files', array('itemid' => $draftitemid));
+
+    // arrange file path
+    $baseurl = "$CFG->wwwroot/draftfile.php/$results->contextid/$results->component/$results->filearea/$results->itemid/$results->filename";
+
+    // configure cloudinary
+    \Cloudinary::config(array( 
+        "cloud_name" => "simaya", 
+        "api_key" => "788485246277552", 
+        "api_secret" => "2tyBTJxRVMdc-YGtqsTts79G6Y0", 
+        "secure" => true
+    ));
+
+    // upload to cloudinary
+    // $upload = \Cloudinary\Uploader::upload(image_to_base64($baseurl));
+    $upload = \Cloudinary\Uploader::upload($baseurl);
+
+    // insert cloudinary url to database
+    $label->url = $upload['secure_url'];
     $label->timemodified = time();
 
     $label->id = $DB->insert_record("cloudinary", $label);
+
+    // delete draft record from database
+    // $DB->delete_records("files", array("itemid" => $draftitemid));
+
+    // // unlink file draft
+    // if (is_file($baseurl)) {
+    //     unlink($baseurl);
+    // }
 
     $completiontimeexpected = !empty($label->completionexpected) ? $label->completionexpected : null;
     \core_completion\api::update_completion_date_event($label->coursemodule, 'cloudinary', $label->id, $completiontimeexpected);
@@ -73,4 +106,11 @@ function cloudinary_view($page, $course, $cm, $context) {
     // Completion.
     $completion = new completion_info($course);
     $completion->set_module_viewed($cm);
+}
+
+function image_to_base64($path)
+{
+    $type = pathinfo($path, PATHINFO_EXTENSION);
+    $data = file_get_contents($path);
+    return 'data:image/' . $type . ';base64,' . base64_encode($data);
 }
