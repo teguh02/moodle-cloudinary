@@ -14,8 +14,10 @@ class mod_cloudinary_mod_form extends moodleform_mod {
  
         $mform =& $this->_form;
  
-        $mform->addElement('filepicker', 'attachment', "Upload a file");
-        $mform->addRule('attachment', null, 'required', null, 'client');
+        // $mform->addElement('filepicker', 'attachment', "Upload a file");
+        $mform->addElement('filepicker', 'my_filemanager', 'Upload a file', null, array('maxbytes' => $CFG->maxbytes, 'maxfiles' => 1, 'accepted_types' => array('*')));
+
+        $mform->addRule('my_filemanager', null, 'required', null, 'client');
         $mform->addElement('static', "description", 'Upload file here and file will be store in your cloudinary account');
 
         // $mform->addElement('textarea', 'deskripsi', 'Description', 'wrap="virtual" rows="4" width="100%"');

@@ -16,11 +16,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Url module admin settings and defaults
+ * Cloudinary module admin settings and defaults
  *
- * @package    mod_url
- * @copyright  2009 Petr Skoda  {@link http://skodak.org}
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package    mod_cloudinary
  */
 
 defined('MOODLE_INTERNAL') || die;

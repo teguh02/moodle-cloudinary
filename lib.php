@@ -1,4 +1,18 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 if (!defined('MOODLE_INTERNAL')) {
     die('Direct access to this script is forbidden.');    ///  It must be included from a Moodle page
@@ -9,43 +23,39 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 function cloudinary_add_instance($label)
 {
-    global $DB, $CFG;
+    global $DB, $CFG, $COURSE;
+    _cloudinaryConfig();
 
-    // get draft file id
-    $draftitemid = file_get_submitted_draft_itemid('attachment');
+    $image                  = new stdClass;
+    $image->itemId          = time();
+    $image->component       = 'mod_cloudinary';
+    $image->tabel_record    = 'cloudinary';
+    $image->filearea        = 'my_filemanager';
+    $image->contextId       = context_module::instance($label->coursemodule)->id;
+    $image->timemodified    = time();
+    $image->draftitemid     = file_get_submitted_draft_itemid($image->filearea);
 
-    // search file in database
-    $results = $DB->get_record('files', array('itemid' => $draftitemid));
+    file_save_draft_area_files($image->draftitemid, $image->contextId, $image->component, $image->filearea, $image->itemId, array('subdirs' => false, 'maxfiles' => 1));
+
+    $results = $DB->get_record('files', array('itemid' => $image->itemId));
+
+    $image->filepath = $results->filepath;
+    $image->filename = $results->filename;
 
     // arrange file path
-    $baseurl = "$CFG->wwwroot/draftfile.php/$results->contextid/$results->component/$results->filearea/$results->itemid/$results->filename";
-
-    // configure cloudinary
-    $config = get_config('cloudinary');
-    \Cloudinary::config(array( 
-        "cloud_name" => $config->cloudname, 
-        "api_key" => $config->api_key, 
-        "api_secret" => $config->api_secret, 
-        "secure" => $config->secure
-    ));
-
+    // sample correct path
+    // http://localhost/pluginfile.php/84/mod_assign/introattachment/0/Official-Logo.png
+    // $image->baseurl = "$CFG->wwwroot/pluginfile.php/$image->contextId/$image->component/$image->filearea/0/$image->filename";
+    // $image->baseurl = file_encode_url($CFG->wwwroot . '/pluginfile.php', '/' . $image->contextId . '/'. $image->component .'/' . $image->filearea);
+    $image->baseurl = moodle_url::make_pluginfile_url($image->contextId, $image->component, $image->filearea, $image->itemId, $image->filepath, $image->filename, false);
+    
     // upload to cloudinary
-    // $upload = \Cloudinary\Uploader::upload(image_to_base64($baseurl));
-    $upload = \Cloudinary\Uploader::upload($baseurl);
+    // $upload = \Cloudinary\Uploader::upload($image->baseurl);
 
     // insert cloudinary url to database
-    $label->url = $upload['secure_url'];
-    $label->timemodified = time();
-
-    $label->id = $DB->insert_record("cloudinary", $label);
-
-    // delete draft record from database
-    // $DB->delete_records("files", array("itemid" => $draftitemid));
-
-    // // unlink file draft
-    // if (is_file($baseurl)) {
-    //     unlink($baseurl);
-    // }
+    $label->url = $image->baseurl;
+    $label->timemodified = $image->timemodified;
+    $label->id = $DB->insert_record($image->tabel_record, $label);
 
     $completiontimeexpected = !empty($label->completionexpected) ? $label->completionexpected : null;
     \core_completion\api::update_completion_date_event($label->coursemodule, 'cloudinary', $label->id, $completiontimeexpected);
@@ -109,9 +119,24 @@ function cloudinary_view($page, $course, $cm, $context) {
     $completion->set_module_viewed($cm);
 }
 
-function image_to_base64($path)
+function getContextId()
 {
-    $type = pathinfo($path, PATHINFO_EXTENSION);
-    $data = file_get_contents($path);
-    return 'data:image/' . $type . ';base64,' . base64_encode($data);
+    global $COURSE;
+    $context = context_course::instance($COURSE->id);
+    return $context->id;
+}
+
+/**
+ * To configure cloudinary
+ */
+function _cloudinaryConfig()
+{
+    // configure cloudinary
+    $config = get_config('cloudinary');
+    return \Cloudinary::config(array( 
+        "cloud_name" => $config->cloudname, 
+        "api_key" => $config->api_key, 
+        "api_secret" => $config->api_secret, 
+        "secure" => $config->secure
+    ));
 }
