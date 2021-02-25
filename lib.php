@@ -23,7 +23,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 function cloudinary_add_instance($label)
 {
-    global $DB, $CFG, $COURSE;
+    global $DB, $CFG;
     _cloudinaryConfig();
     
     $image                  = new stdClass;
@@ -39,28 +39,52 @@ function cloudinary_add_instance($label)
     file_save_draft_area_files($image->draftitemid, $image->contextId, $image->component, $image->filearea, $image->itemId, array('subdirs' => false, 'maxfiles' => 1));
 
     // ambil file draft yang sudah direkam dalam database
-    $results = $DB->get_record('files', array('itemid' => $image->draftitemid));
-    $image->filepath = $results->filepath;
-    $image->filename = $results->filename;
+    $results = $DB->get_record('files', array('itemid' => $image->itemId));
 
-    // arrange file path
-    // sample correct path
-    // http://localhost/pluginfile.php/84/mod_assign/introattachment/0/Official-Logo.png
-    // $image->baseurl = "$CFG->wwwroot/pluginfile.php/$image->contextId/$image->component/$image->filearea/$image->itemId/$image->filename";
-    $fs = get_file_storage();
-    $file = $fs->get_file($image->contextId, $image->component, $image->filearea, $image->itemId, $image->filepath, $image->filename);
-    $image->baseurl = moodle_url::make_pluginfile_url($file->get_contextid(), $file->get_component(), $file->get_filearea(), $file->get_itemid(), $file->get_filepath(), $file->get_filename(), false);
+    // cek permission ke filedir
+    if (!is_writable($CFG->dataroot . '/filedir/')) {
+        print_error("The " . $CFG->dataroot . '/filedir/' . ' are not writable');
+        die();
+    }
+
+    // cari file yang disimpan kedalam folder moodledata
+    $image->file_in_moodle_data = rsearch($CFG->dataroot . '/filedir/', "/" . $results->contenthash);
+
+    // cek apakah folder bisa di write?
+    if (!is_writable(__DIR__ . '/temp/')) {
+        print_error("The " . __DIR__ . '/temp/' . ' are not writable');
+        die();
+    }
+
+    // definisikan path folder temp
+    $image->file_in_temp_folder = __DIR__ . '/temp/' . $results->contenthash . '.jpg';
+
+    // copy file ke temp folder
+    if (!copy($image->file_in_moodle_data, $image->file_in_temp_folder)) {
+        print_error("Failed to copy file $results->contenthash to " . $image->file_in_temp_folder);
+        die();
+    }
 
     // upload to cloudinary
-    // $upload = \Cloudinary\Uploader::upload($image->baseurl);
+    $upload = \Cloudinary\Uploader::upload($image->file_in_temp_folder);
 
     // insert cloudinary url to database
-    $label->url = $image->baseurl;
+    $label->url = $upload['secure_url'];
     $label->timemodified = $image->timemodified;
     $label->id = $DB->insert_record($image->tabel_record, $label);
 
     $completiontimeexpected = !empty($label->completionexpected) ? $label->completionexpected : null;
     \core_completion\api::update_completion_date_event($label->coursemodule, 'cloudinary', $label->id, $completiontimeexpected);
+
+    // hapus file didalam folder temp
+    if (is_file($image->file_in_temp_folder)) {
+        unlink($image->file_in_temp_folder);
+    }
+
+    // hapus file didalam folder moodledata
+    if (is_file($image->file_in_moodle_data)) {
+        unlink($image->file_in_moodle_data);
+    }
 
     return $label->id;
 }
@@ -141,4 +165,14 @@ function _cloudinaryConfig()
         "api_secret" => $config->api_secret, 
         "secure" => $config->secure
     ));
+}
+
+function rsearch($folder, $pattern) {
+    $iti = new RecursiveDirectoryIterator($folder);
+    foreach(new RecursiveIteratorIterator($iti) as $file){
+         if(strpos($file , $pattern) !== false){
+            return $file;
+         }
+    }
+    return false;
 }
