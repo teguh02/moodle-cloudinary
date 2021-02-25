@@ -25,30 +25,32 @@ function cloudinary_add_instance($label)
 {
     global $DB, $CFG, $COURSE;
     _cloudinaryConfig();
-
+    
     $image                  = new stdClass;
     $image->itemId          = time();
-    $image->component       = 'mod_cloudinary';
+    $image->component       = 'cloudinary';
     $image->tabel_record    = 'cloudinary';
     $image->filearea        = 'my_filemanager';
     $image->contextId       = context_module::instance($label->coursemodule)->id;
     $image->timemodified    = time();
     $image->draftitemid     = file_get_submitted_draft_itemid($image->filearea);
 
+    // simpan file draft menjadi file yang sesungguhnya
     file_save_draft_area_files($image->draftitemid, $image->contextId, $image->component, $image->filearea, $image->itemId, array('subdirs' => false, 'maxfiles' => 1));
 
-    $results = $DB->get_record('files', array('itemid' => $image->itemId));
-
+    // ambil file draft yang sudah direkam dalam database
+    $results = $DB->get_record('files', array('itemid' => $image->draftitemid));
     $image->filepath = $results->filepath;
     $image->filename = $results->filename;
 
     // arrange file path
     // sample correct path
     // http://localhost/pluginfile.php/84/mod_assign/introattachment/0/Official-Logo.png
-    // $image->baseurl = "$CFG->wwwroot/pluginfile.php/$image->contextId/$image->component/$image->filearea/0/$image->filename";
-    // $image->baseurl = file_encode_url($CFG->wwwroot . '/pluginfile.php', '/' . $image->contextId . '/'. $image->component .'/' . $image->filearea);
-    $image->baseurl = moodle_url::make_pluginfile_url($image->contextId, $image->component, $image->filearea, $image->itemId, $image->filepath, $image->filename, false);
-    
+    // $image->baseurl = "$CFG->wwwroot/pluginfile.php/$image->contextId/$image->component/$image->filearea/$image->itemId/$image->filename";
+    $fs = get_file_storage();
+    $file = $fs->get_file($image->contextId, $image->component, $image->filearea, $image->itemId, $image->filepath, $image->filename);
+    $image->baseurl = moodle_url::make_pluginfile_url($file->get_contextid(), $file->get_component(), $file->get_filearea(), $file->get_itemid(), $file->get_filepath(), $file->get_filename(), false);
+
     // upload to cloudinary
     // $upload = \Cloudinary\Uploader::upload($image->baseurl);
 
