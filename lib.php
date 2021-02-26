@@ -51,22 +51,22 @@ function cloudinary_add_instance($label)
     $image->file_in_moodle_data = rsearch($CFG->dataroot . '/filedir/', "/" . $results->contenthash);
 
     // cek apakah folder bisa di write?
-    if (!is_writable(__DIR__ . '/temp/')) {
-        print_error("The " . __DIR__ . '/temp/' . ' are not writable');
-        die();
-    }
+    // if (!is_writable(__DIR__ . '/temp/')) {
+    //     print_error("The " . __DIR__ . '/temp/' . ' are not writable');
+    //     die();
+    // }
 
     // definisikan path folder temp
-    $image->file_in_temp_folder = __DIR__ . '/temp/' . $results->contenthash . '.jpg';
+    // $image->file_in_temp_folder = __DIR__ . '/temp/' . $results->contenthash . '.jpg';
 
     // copy file ke temp folder
-    if (!copy($image->file_in_moodle_data, $image->file_in_temp_folder)) {
-        print_error("Failed to copy file $results->contenthash to " . $image->file_in_temp_folder);
-        die();
-    }
+    // if (!copy($image->file_in_moodle_data, $image->file_in_temp_folder)) {
+    //     print_error("Failed to copy file $results->contenthash to " . $image->file_in_temp_folder);
+    //     die();
+    // }
 
     // upload to cloudinary
-    $upload = \Cloudinary\Uploader::upload($image->file_in_temp_folder);
+    $upload = \Cloudinary\Uploader::upload($image->file_in_moodle_data);
 
     // insert cloudinary url to database
     $label->url = $upload['secure_url'];
@@ -77,9 +77,9 @@ function cloudinary_add_instance($label)
     \core_completion\api::update_completion_date_event($label->coursemodule, 'cloudinary', $label->id, $completiontimeexpected);
 
     // hapus file didalam folder temp
-    if (is_file($image->file_in_temp_folder)) {
-        unlink($image->file_in_temp_folder);
-    }
+    // if (is_file($image->file_in_temp_folder)) {
+    //     unlink($image->file_in_temp_folder);
+    // }
 
     // hapus file didalam folder moodledata
     if (is_file($image->file_in_moodle_data)) {
